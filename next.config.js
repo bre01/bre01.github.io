@@ -5,12 +5,13 @@ const { withContentlayer } = require("next-contentlayer");
 const isGithubActions = process.env.GITHUB_ACTIONS || false
 
 let assetPrefix = ''
-let basePath = '/'
+let basePath = ''
 
 if (isGithubActions) {
   // trim off `<owner>/`
   const repo = process.env.GITHUB_REPOSITORY.replace(/.*?\//, '')
 
+  
   assetPrefix = ``
   basePath = ``
 }
@@ -24,6 +25,9 @@ const nextConfig = {
   swcMinify: true,
   assetPrefix:assetPrefix,
   basePath:basePath,
+  images:{
+    unoptimized:true,
+  }
 };
 
 module.exports = withContentlayer(nextConfig);
