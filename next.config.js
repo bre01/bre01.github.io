@@ -1,7 +1,5 @@
 const { withContentlayer } = require("next-contentlayer");
-const repo='https://bre01.github.io'
-const myAssetPrefix=`/${repo}`;
-const myBasePath=`$/{repo}`
+
 
 
 const isGithubActions = process.env.GITHUB_ACTIONS || false
