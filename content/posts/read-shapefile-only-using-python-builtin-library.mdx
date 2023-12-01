@@ -1,0 +1,67 @@
+---
+title: Read shapefile using python-- the hard way
+description: Read shapefile only using python's built in libraray
+date: 2023-12-1
+---
+
+Shapefile is open source, well, sort of. ESRI did not provide any tool to read it easily, 
+but at least it provided the technical 
+[specification](https://www.esri.com/content/dam/esrisites/sitecore-archive/Files/Pdfs/library/whitepapers/pdfs/shapefile.pdf). 
+So it won't be so hard to write our own library that reads binary from it and convert it to some format 
+that is more friendly.  
+In the blog, I will try to use python's built in library to read shapefile, and convert it to Geojson. 
+So we can use it in our web application.
+A Shapefile usually contains three files, .shp, .shx, .dbf. The .shp file contains the geometry information,
+the .shx file contains the index information, and the .dbf file contains the attribute information.
+There maybe be other files,like proj file about map project that is not compulsory and usually exclusively used by ESRI, so we will not try to Read and Convert it.  
+
+Reading through the specification, we can find the shp file is quite intuitive, it only contains one geometry type,
+if the geometry type is point, then the record is about a point, if the geometry type is polyline, 
+then the record is multiple points that form a the geometry.  
+
+<Image src="/shapefile1.png" width="718" height="404" alt="Image" />
+The File Header takes up 100 bytes(50 words)
+A lot of bytes is reserved and what we need is the file length and the geometry type which 
+set at byte 24-27 and byte 32-35 respectively.
+one thing we need to notice is that the byte order of file length is big endian, while the byte order of geometry type is little endian. 
+after we know the these two crucial information, we can start to read the records.  
+Each record Header takes up 8 bytes(4 words), I keep stress **word** cause it's used in the whitepaper extensively, and the Record Content length is variable and specified in the Record Header.  
+<Image src='/recordHeader.png' width="718" height="404" alt="Image"/>
+Every record Header contains the record number(integer) and the record length(integer), both are big endian that set at byte 0-3 and byte 4-7 respectively.
+The record number begins with **1** and increments sequentially. The record length is the length of the record content in 16-bit words.
+So each record takes up (2 byte * record length + 8) bytes
+
+shapefile have a lot of types of geometry, but we will only focus on the three most common types, point, polyline and polygon.
+A point consists of a pair of double-precision coordinates in the order X,Y.
+The record content of point is quite simple, it only contains the x and y coordinate of the point, 
+both are double precision floating point number, and both are little endian,
+
+<Image src='/pointStructure.png' width='718' height="404" alt="Image"/>
+----
+<Image src="/PointStructure2.png" width='718' height="404" alt="Image"/>
+
+
+while polyline and polygon contains a list of points;
+<Image src="/polyline.png" width='718' height="404" alt="Image"/>
+It also have a bounding box that is used to speed up the rendering process.
+A polyline can be divide into multiple parts, each part is a list of points,
+We can find the parts info at byte 44~(x-1), x = 44 + 4 * num_parts, the parts section stores the index of the first point of each part respect to
+the following points section which is a array of points.  
+For example, if the parts section is [0, 3, 5], then the first part is the first three points in the points section.
+
+And what about polygon?
+Actually, we can think of polygon as a special case of polyline, 
+the only difference is that the last point of the polygon is the same as the first point.  
+with thses information, we can start to write our own library to read shapefile's geometry information
+
+```python
+
+
+
+
+
+
+
+
+
+
