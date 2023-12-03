@@ -84,19 +84,22 @@ class Shp(object):
         self.load_shp(shapeName)
 
     def load_shp(self,shapeName):
-        shp_ext = "shp"
-        self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+        self.shp = open("%s.%s" % (shapefile_name, "shp"), "rb")
+        self.shx = open("%s.%s" % (shapefile_name, "shx"), "rb")
         self._file_to_close.append(self.shp)
+        self._file_to_close.append(self.shx)
         if (self.shp):
             self.load_shp_header()
+        if (self.shx):
+            self.load_shx_header()
     def load_shp_header(self):
         shp = self.shp
         shp.seek(24)
         # file length big endian
         self.shpLength = unpack(">i", shp.read(4))[0] * 2
-        # from word to byte
+        # from word(2 bytes) to byte
 
-        # shape type little endian
+        # shape type :little endian
         shp.seek(32)
         #small endian, one integer, 4 bytes
         self.shapeType = unpack("<i", shp.read(4))[0] #unpack returns a tuple,
@@ -114,7 +117,89 @@ class Shp(object):
                 self.mbox.append(m)
             else:
                 self.mbox.append(None)
+    def load_shx_header(self):
+        """Reads the header information from a .shx file."""
+        shx = self.shx
+        if not shx:
+            raise Exception(
+                "Shapefile Reader requires a shapefile or file-like object. (no shx file found"
+            )
+        # File length (16-bit word * 2 = bytes) - header length
+        shx.seek(24)
+        shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
+        self.numShapes = shxRecordLength // 8
+    
+
 ```
+So the shp's header has been read to momery
+We can start to read the content of each feature's geometry
+We can return a generator that yields the geometry of each feature,
+the generator can be really helpful when we have a large shapefile
+```python
+# we create a Shape class to represent the geometry and header of each feature
+class Shape(object):
+    def __init__(
+        self,   oid=None
+    ):
+        #parts are some information used by multiparts geometry
+        #like multipolyline and multipolygon
+        #we read it but do not use it
+        self.shapeType = None
+        self.points = []
+        self.parts = []
+        if partTypes:
+            self.partTypes = partTypes
+
+        # and a dict to silently record any errors encountered
+        self._errors = {}
+
+        # add oid which is the index of the feature in the shapefile
+        if oid is not None:
+            self.__oid = oid
+        else:
+            self.__oid = -1
+
+
+
+
+
+class Shp(object):
+    ... 
+
+    def iterShapes(self, bbox=None):
+        """Returns a generator of shapes in a shapefile. Useful
+        for handling large shapefiles.
+        To only read shapes within a given spatial region, specify the 'bbox'
+        arg as a list or tuple of xmin,ymin,xmax,ymax.
+        """
+        shp = self.__getFileObj(self.shp)
+        # Found shapefiles which report incorrect
+        # shp file length in the header. Can't trust
+        # that so we seek to the end of the file
+        # and figure it out.
+        shp.seek(0, 2)
+        shpLength = shp.tell()
+        shp.seek(100)
+
+
+        # Instead iterate until reach end of file
+        # Collect the offset indices during iteration
+        i = 0
+        offsets = []
+        pos = shp.tell()
+        while pos < shpLength:
+            offsets.append(pos)
+            shape = self.setShapeIndex(oid=i, )
+            pos = shp.tell()
+            if shape:
+                yield shape
+            i += 1
+        # Entire shp file consumed
+        # Update the number of shapes and list of offsets
+        assert i == len(offsets)
+        self.numShapes = i
+        self._offsets = offsets
+        
 
 
 
@@ -123,3 +208,77 @@ class Shp(object):
 
 
 
+
+
+```
+the Shape class can be converted to json use the to_json method
+```python
+class Shape(object):
+    ...
+    def to_json(self):
+        if self.shapeType=="Point":
+            # the point only contains one point
+            return {"type": "Point", "coordinates": tuple(self.points[0])}
+        elif self.shapeType=="Polyline":
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "LineString", "coordinates": []}
+            elif len(self.parts) == 1:
+                # linestring
+                return {
+                    "type": "LineString",
+                    "coordinates": [tuple(p) for p in self.points],
+                }
+            else:
+                # multilinestring
+                ps = None
+                coordinates = []
+                for part in self.parts:
+                    if ps == None:
+                        ps = part
+                        continue
+                    else:
+                        coordinates.append([tuple(p) for p in self.points[ps:part]])
+                        ps = part
+                else:
+                    coordinates.append([tuple(p) for p in self.points[part:]])
+                return {"type": "MultiLineString", "coordinates": coordinates}
+        elif self.shapeType=="Polygon":
+            if len(self.parts) == 0:
+                # the shape has no coordinate information, i.e. is 'empty'
+                # the geojson spec does not define a proper null-geometry type
+                # however, it does allow geometry types with 'empty' coordinates to be interpreted as null-geometries
+                return {"type": "Polygon", "coordinates": []}
+            else:
+                # get all polygon rings
+                rings = []
+                for i in range(len(self.parts)):
+                    # get indexes of start and end points of the ring
+                    start = self.parts[i]
+                    try:
+                        end = self.parts[i + 1]
+                    except IndexError:
+                        end = len(self.points)
+
+                    # extract the points that make up the ring
+                    ring = [tuple(p) for p in self.points[start:end]]
+                    rings.append(ring)
+
+                # organize rings into list of polygons, where each polygon is defined as list of rings.
+                # the first ring is the exterior and any remaining rings are holes (same as GeoJSON).
+                polys = organize_polygon_rings(rings, self._errors)
+
+                # return as geojson
+                if len(polys) == 1:
+                    return {"type": "Polygon", "coordinates": polys[0]}
+                else:
+                    return {"type": "MultiPolygon", "coordinates": polys}
+
+        else:
+            
+            raise Exception("Unknown shape type")
+
+
+```
