@@ -54,9 +54,67 @@ Actually, we can think of polygon as a special case of polyline,
 the only difference is that the last point of the polygon is the same as the first point.  
 with thses information, we can start to write our own library to read shapefile's geometry information
 
+First thing first, We need a class to represent the shapefile.
 ```python
+class Shp(object):
+    def __init__(self,*agrs):
+        #set the path of the first parameter as the path of the shapefile when  Shp is initialized
+        self.path=agrs[0] 
+        self.shp=None
+        #a list to hold file opened, so we can close them later
+        self._file_to_close()=[]
+        self.shpLength=None
+        self.shapeType=None
+        self.numShapes=None
+        self.shapeName=None
+        self.encoding = 'utf-8'
+        self.encoding_errors = 'strict'
+```
+The very first information we need in order to read .shp file is the shp file's header,
+So we load the shp file and read the header in the constructor.
+```python
+class Shp(object):
+    def __init__(self,*args)
+        ...
+        self.load()
 
+    def  load(self,shapeName):
+        (shapeName, ext) = os.path.splitext(shapefile)
+        self.shapeName = shapeName
+        self.load_shp(shapeName)
 
+    def load_shp(self,shapeName):
+        shp_ext = "shp"
+        self.shp = open("%s.%s" % (shapefile_name, shp_ext), "rb")
+        self._file_to_close.append(self.shp)
+        if (self.shp):
+            self.load_shp_header()
+    def load_shp_header(self):
+        shp = self.shp
+        shp.seek(24)
+        # file length big endian
+        self.shpLength = unpack(">i", shp.read(4))[0] * 2
+        # from word to byte
+
+        # shape type little endian
+        shp.seek(32)
+        #small endian, one integer, 4 bytes
+        self.shapeType = unpack("<i", shp.read(4))[0] #unpack returns a tuple,
+        #so we need to get the first element of the tuple
+        #four double that represent the bounding box
+        self.bbox = _Array("d", unpack("<4d", shp.read(32)))
+        #two double that represent the z box 
+        self.zbox = _Array("d", unpack("<2d", shp.read(16)))
+        #two double that represent the m box
+        self.mbox = []
+        for m in _Array("d", unpack("<2d", shp.read(16))):
+            NODATA = -10e38 #according to the whitepaper, number < -10e38 is considered as nodata
+            #we can also specify the nodata value at  the top of the file
+            if m > NODATA:
+                self.mbox.append(m)
+            else:
+                self.mbox.append(None)
+```
 
 
 
