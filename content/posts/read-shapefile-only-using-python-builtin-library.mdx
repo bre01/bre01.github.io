@@ -24,6 +24,8 @@ The File Header takes up 100 bytes(50 words)
 A lot of bytes is reserved and what we need is the file length and the geometry type which 
 set at byte 24-27 and byte 32-35 respectively.
 one thing we need to notice is that the byte order of file length is big endian, while the byte order of geometry type is little endian. 
+after it there are four double precision numbers that represent the bounding box of the shapefile
+<Image src="/shapeMain.png" width="718" height="404" alt="Image" />
 after we know the these two crucial information, we can start to read the records.  
 Each record Header takes up 8 bytes(4 words), I keep stress **word** cause it's used in the whitepaper extensively, and the Record Content length is variable and specified in the Record Header.  
 <Image src='/recordHeader.png' width="718" height="404" alt="Image"/>
@@ -117,21 +119,10 @@ class Shp(object):
                 self.mbox.append(m)
             else:
                 self.mbox.append(None)
-    def load_shx_header(self):
-        """Reads the header information from a .shx file."""
-        shx = self.shx
-        if not shx:
-            raise Exception(
-                "Shapefile Reader requires a shapefile or file-like object. (no shx file found"
-            )
-        # File length (16-bit word * 2 = bytes) - header length
-        shx.seek(24)
-        shxRecordLength = (unpack(">i", shx.read(4))[0] * 2) - 100
-        self.numShapes = shxRecordLength // 8
-    
+ 
 
 ```
-So the shp's header has been read to momery
+So the shp's header has been read to memory
 We can start to read the content of each feature's geometry
 We can return a generator that yields the geometry of each feature,
 the generator can be really helpful when we have a large shapefile
@@ -141,12 +132,14 @@ class Shape(object):
     def __init__(
         self,   oid=None
     ):
-        #parts are some information used by multiparts geometry
-        #like multipolyline and multipolygon
-        #we read it but do not use it
+        #when we init a Shape, we give it oid
         self.shapeType = None
         self.points = []
         self.parts = []
+        #we set these public fields so 
+        #that we can set it outside the class 
+        
+
         if partTypes:
             self.partTypes = partTypes
 
@@ -158,11 +151,15 @@ class Shape(object):
             self.__oid = oid
         else:
             self.__oid = -1
+```
 
 
 
+we define a method that lazily read the geometry of each feature
+by utilizing generator,
+the geometry is only read when we need it
 
-
+```python
 class Shp(object):
     ... 
 
@@ -178,6 +175,7 @@ class Shp(object):
         # that so we seek to the end of the file
         # and figure it out.
         shp.seek(0, 2)
+         
         shpLength = shp.tell()
         shp.seek(100)
 
@@ -189,7 +187,10 @@ class Shp(object):
         pos = shp.tell()
         while pos < shpLength:
             offsets.append(pos)
-            shape = self.setShapeIndex(oid=i, )
+            #when we create a Shape, we give it oid
+            shape = self.setShapeIndexAndRead(oid=i, )
+            #because of the use of generator,
+            #the shape is read when each __next__ is called
             pos = shp.tell()
             if shape:
                 yield shape
@@ -199,23 +200,314 @@ class Shp(object):
         assert i == len(offsets)
         self.numShapes = i
         self._offsets = offsets
+    def setShapeIndexAndRead(self, oid=None):
+
+
+        """Returns the header info and geometry for a single shape."""
+        f = self.__getFileObj(self.shp)
+        single_shape = Shape(oid=oid)
+        nParts = nPoints = zmin = zmax = mmin = mmax = None
+        (recIndex, recLength) = unpack(">2i", f.read(8))
+        #print(recIndex,"||",oid)
+        #the recIndex =oid+1 because the oid starts from 0
+        #while recIndex starts from 1
+
+        # Determine the start of the next record
+        next = f.tell() + (2 * recLength)
+        shapeType = unpack("<i", f.read(4))[0]
+        single_shape.shapeType = shapeType
+        # For Null shapes create an empty points list for consistency
+        if shapeType == 0:
+            single_shape.points = []
+
+        # All shape types capable of having a bounding box
+        elif shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+            single_shape.bbox = _Array("d", unpack("<4d", f.read(32)))
+            # if bbox specified and no overlap, skip this shape
         
+        # Shape types with parts
+        if shapeType in (3, 5, 13, 15, 23, 25, 31):
+            nParts = unpack("<i", f.read(4))[0]
+
+
+        # Shape types with points
+        if shapeType in (3, 5, 8, 13, 15, 18, 23, 25, 28, 31):
+            nPoints = unpack("<i", f.read(4))[0]
+        # Read parts
+        if nParts:
+            single_shape.parts = _Array("i", unpack("<%si" % nParts, f.read(nParts * 4)))
 
 
 
+        # Read points - produces a list of [x,y] values
+        if nPoints:
+            flat = unpack("<%sd" % (2 * nPoints), f.read(16 * nPoints))
+            #make the points into the form of [x,y] 
+            single_shape.points = list(zip(*(iter(flat),) * 2))
+
+
+        # Read a single point
+        if shapeType in (1, 11, 21):
+            #only read two point, simply make it a array
+            single_shape.points = [_Array("d", unpack("<2d", f.read(16)))]
+         
+        # Seek to the end of this record as defined by the record header because
+        # the shapefile spec doesn't require the actual content to meet the header
+        # definition.  Probably allowed for lazy feature deletion.
+        f.seek(next)
+        return single_shape    
+
+```
+Now we have every shape geometry 
+since we are dealing with the point,
+polyline,ploygon,we only care about the points and parts of each shape
+
+## the gotcha of shapefile about *multi*
+
+- GeoJson has a concept of *multi* geometry, like MultiPoint, MultiLineString, MultiPolygon
+- Shapefile does not have this concept, but it has a concept of *parts*.
+- polygon and polyline both have parts, but that doesn't mean they are *multi* geometry
+- and  having multiple parts still does not mean it is a *multi* geometry
+- when convert to GeoJson, we have to decide whether it is a *multi* geometry or not by computing the geometry
+
+A part can have one exterior ring and any number of interior rings,
+and it's the number of exterior rings that determine whether it is a *multi* geometry or not
+## MultiPolygon
+<Image src='/Multi.png' width='718' height="404" alt="Image"/>
+-----
+## Ploygon
+<Image src='/NoMulti.png' width='718' height="404" alt="Image"/>
 
 
 
+the index in parts section is the index of the first point of each part(exterior or interior line) respect to
+
+1. if there is only one part , then of course it's a polygon or polyline(in the concept of GeoJson)
+2. if the number of exterior rings is 1, it's a polygon 
+3. if the number of exterior rings is greater than 1, it's a MultiPolygon 
 
 
+wheter a part is exterior or interior is determined by the winding order of the points in the part
+
+<Image src='/aboutRing.png' width='718' height="404" alt="Image"/>
+
+We can write a function that accept a list of rings and return a list of polygons
+this is a very sophisticated function from open source library *pyshp*, it uses other functions like
+is_cw, ring_bbox, bbox_contains, ring_sample, ring_contains_point, signed_area
+you can find the implementation of these functions in the source code of pyshp
+and you can also check the concise code on [my Github](https://github.com/bre01/pyshp)
+
+```python
+def organize_polygon_rings(rings, return_errors=None):
+    """Organize a list of coordinate rings into one or more polygons with holes.
+    Returns a list of polygons, where each polygon is composed of a single exterior
+    ring, and one or more interior holes. If a return_errors dict is provided (optional),
+    any errors encountered will be added to it.
+
+    Rings must be closed, and cannot intersect each other (non-self-intersecting polygon).
+    Rings are determined as exteriors if they run in clockwise direction, or interior
+    holes if they run in counter-clockwise direction. This method is used to construct
+    GeoJSON (multi)polygons from the shapefile polygon shape type, which does not
+    explicitly store the structure of the polygons beyond exterior/interior ring orientation.
+    """
+    # first iterate rings and classify as exterior or hole
+    exteriors = []
+    holes = []
+    for ring in rings:
+        # shapefile format defines a polygon as a sequence of rings
+        # where exterior rings are clockwise, and holes counterclockwise
+        if is_cw(ring):
+            # ring is exterior
+            exteriors.append(ring)
+        else:
+            # ring is a hole
+            holes.append(ring)
+
+    # if only one exterior, then all holes belong to that exterior
+    if len(exteriors) == 1:
+        # exit early
+        poly = [exteriors[0]] + holes
+        polys = [poly]
+        return polys
+
+    # multiple exteriors, ie multi-polygon, have to group holes with correct exterior
+    # shapefile format does not specify which holes belong to which exteriors
+    # so have to do efficient multi-stage checking of hole-to-exterior containment
+    elif len(exteriors) > 1:
+        # exit early if no holes
+        if not holes:
+            polys = []
+            for ext in exteriors:
+                poly = [ext]
+                polys.append(poly)
+            return polys
+
+        # first determine each hole's candidate exteriors based on simple bbox contains test
+        hole_exteriors = dict([(hole_i, []) for hole_i in xrange(len(holes))])
+        exterior_bboxes = [ring_bbox(ring) for ring in exteriors]
+        for hole_i in hole_exteriors.keys():
+            hole_bbox = ring_bbox(holes[hole_i])
+            for ext_i, ext_bbox in enumerate(exterior_bboxes):
+                if bbox_contains(ext_bbox, hole_bbox):
+                    hole_exteriors[hole_i].append(ext_i)
+
+        # then, for holes with still more than one possible exterior, do more detailed hole-in-ring test
+        for hole_i, exterior_candidates in hole_exteriors.items():
+            if len(exterior_candidates) > 1:
+                # get hole sample point
+                ccw = not is_cw(holes[hole_i])
+                hole_sample = ring_sample(holes[hole_i], ccw=ccw)
+                # collect new exterior candidates
+                new_exterior_candidates = []
+                for ext_i in exterior_candidates:
+                    # check that hole sample point is inside exterior
+                    hole_in_exterior = ring_contains_point(
+                        exteriors[ext_i], hole_sample
+                    )
+                    if hole_in_exterior:
+                        new_exterior_candidates.append(ext_i)
+
+                # set new exterior candidates
+                hole_exteriors[hole_i] = new_exterior_candidates
+
+        # if still holes with more than one possible exterior, means we have an exterior hole nested inside another exterior's hole
+        for hole_i, exterior_candidates in hole_exteriors.items():
+            if len(exterior_candidates) > 1:
+                # exterior candidate with the smallest area is the hole's most immediate parent
+                ext_i = sorted(
+                    exterior_candidates,
+                    key=lambda x: abs(signed_area(exteriors[x], fast=True)),
+                )[0]
+                hole_exteriors[hole_i] = [ext_i]
+
+        # separate out holes that are orphaned (not contained by any exterior)
+        orphan_holes = []
+        for hole_i, exterior_candidates in list(hole_exteriors.items()):
+            if not exterior_candidates:
+                orphan_holes.append(hole_i)
+                del hole_exteriors[hole_i]
+                continue
+
+        # each hole should now only belong to one exterior, group into exterior-holes polygons
+        polys = []
+        for ext_i, ext in enumerate(exteriors):
+            poly = [ext]
+            # find relevant holes
+            poly_holes = []
+            for hole_i, exterior_candidates in list(hole_exteriors.items()):
+                # hole is relevant if previously matched with this exterior
+                if exterior_candidates[0] == ext_i:
+                    poly_holes.append(holes[hole_i])
+            poly += poly_holes
+            polys.append(poly)
+
+        # add orphan holes as exteriors
+        for hole_i in orphan_holes:
+            ext = holes[hole_i]
+            # add as single exterior without any holes
+            poly = [ext]
+            polys.append(poly)
+
+        if orphan_holes and return_errors is not None:
+            return_errors["polygon_orphaned_holes"] = len(orphan_holes)
+
+        return polys
+
+    # no exteriors, be nice and assume due to incorrect winding order
+    else:
+        if return_errors is not None:
+            return_errors["polygon_only_holes"] = len(holes)
+        exteriors = holes
+        # add as single exterior without any holes
+        polys = [[ext] for ext in exteriors]
+        return polys
 
 
 ```
-the Shape class can be converted to json use the to_json method
+the Geojson from converted from shapefile will contain a object
+that has a type property that is set to "FeatureCollection" and a features object
+that consist of a list of features, each feature has a geometry object and a properties object,and a type property 
+that is set to feature
+
+this is the polygon's json structure 
+the endless [ and ] can frustrating
+
+```json
+{
+    "type": "FeatureCollection", 
+    "features": [
+        {
+            "type": "Feature", 
+            "properties":null, 
+            "geometry": {
+                "type": "Polygon", 
+                "coordinates": [
+                    [[20.0, 20.0], [20.0, 30.0], [30.0, 30.0], [20.0, 20.0]], 
+                    [[0.0, 0.0], [100.0, 0.0], [100.0, 100.0], [0.0, 100.0], [0.0, 0.0]]
+                ]
+                }
+        },
+        {   
+            "type": "Feature", 
+            "properties": null,
+            "geometry": 
+            {
+                "type": "Polygon", 
+                "coordinates": [
+                    [[150.0, 150.0], [160.0, 150.0], [180.0, 170.0], [150.0, 150.0]]
+                ]
+            }
+        }, 
+    ], 
+    "bbox": [0.0, 0.0, 180.0, 170.0]}
+```
+
+----
+
+if the coordinates is like this for every single geometry
+```json
+"coordinates":[1.0,2.0]
+```
+it's a *point*
+
+----
+
+```json 
+"coordinates":[[1.0,2.0],[3.0,4.0]]
+```
+*LineString*  or  *MultiPoint* depending on the type property
+
+----  
+
+```json
+"coordinates":[
+    [[0.0,10.0],[10.0,10.0],[10.0,0.0],[0.0,0.0]]
+    [[1.0,2.0],[3.0,4.0],[5.0,6.0],[1.0,2.0]], 
+    ]
+```
+*Polygon*  or  *MultiLineString* depending on the type property
+
+----
+
+```json
+"coordinates":[
+    [
+        [[1.0,2.0],[3.0,4.0],[5.0,6.0],[1.0,2.0]], 
+        [[7.0,8.0],[9.0,10.0],[11.0,12.0],[7.0,8.0]]],
+    [
+        [[13.0,14.0],[15.0,16.0],[17.0,18.0],[13.0,14.0]]
+    ]
+]
+```
+*multipolygon*  that have two polygons  
+The first polygon have two rings, the first ring is the exterior ring and the second ring is the interior ring
+and the second polygon only has one exterior ring 
+
+the Shape class can be converted to json use the \_\_json__ method
 ```python
 class Shape(object):
     ...
-    def to_json(self):
+    def __json__(self):
         if self.shapeType=="Point":
             # the point only contains one point
             return {"type": "Point", "coordinates": tuple(self.points[0])}
@@ -269,7 +561,7 @@ class Shape(object):
                 # organize rings into list of polygons, where each polygon is defined as list of rings.
                 # the first ring is the exterior and any remaining rings are holes (same as GeoJSON).
                 polys = organize_polygon_rings(rings, self._errors)
-
+                   
                 # return as geojson
                 if len(polys) == 1:
                     return {"type": "Polygon", "coordinates": polys[0]}
@@ -279,6 +571,65 @@ class Shape(object):
         else:
             
             raise Exception("Unknown shape type")
+```
+every Shape instance will be convert to a dict as a feature to be added to the features list
+we also set the the properties of each feature to None for now,
 
 
+
+
+
+```python
+class Shp():
+    ...
+    def iterShapeRecords(self):
+
+        # the number of shape and record should be the same
+        # in a typical(correct) shapefile 
+        # so we combine dbf attribute and shape into the a shapeRecord
+        # but for now we only care about shape so set the record to None
+        # the None will be convert to null in json
+        for shape in self.iterShapes():
+            yield ShapeRecord(shape=shape, record=None)
+```
+we set a ShapeRecord class to hold the shape and the record
+```python 
+class ShapeRecord(object):
+    """A ShapeRecord object containing a shape along with its attributes.
+    Provides the __json__ property to return a Feature dictionary."""
+
+    def __init__(self, shape=None, record=None):
+        self.shape = shape
+        self.record = record
+
+    # line 493
+    @property
+    def __json__(self):
+
+        # we don't have properties now, so return properties as null 
+        return {
+            "type": "Feature",
+            "properties": None,
+            "geometry": self.shape.__json__
+        }
+```
+So we can wrap the ShapeRecords into a FeatureCollection
+```python 
+class Shp():
+    ...
+    def __json__(self):
+        """Returns a GeoJSON FeatureCollection representation of the shapefile."""
+        return {
+            "type": "FeatureCollection",
+            "features": [sr.__json__ for sr in self.iterShapeRecords()],
+            "bbox": self.bbox,
+        }
+```
+The main function like like this,
+We can use json to dump the dict out
+```python
+a=Shp("test.shp")
+geoJson=a.__json__()
+with open("test.json","w") as f:
+    json.dump(geoJson,f)
 ```
