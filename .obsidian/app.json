@@ -1,0 +1,7 @@
+{
+  "showUnsupportedFiles": true,
+  "vimMode": true,
+  "livePreview": false,
+  "useMarkdownLinks": true,
+  "attachmentFolderPath": "public/paste_images/"
+}
