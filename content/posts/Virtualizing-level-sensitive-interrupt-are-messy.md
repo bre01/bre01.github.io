@@ -4,6 +4,7 @@ description: To determine what can be lost, and can not
 date: 2026-1-27
 type: Post
 cate: Virtulization, interrupt handling
+cover: "/paste_images/Pasted%20image%2020260127205148.png"
 ---
 
 ```mermaid
