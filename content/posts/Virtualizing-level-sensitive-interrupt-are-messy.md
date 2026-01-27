@@ -1,5 +1,5 @@
 ---
-title: Virtualizing-level-sensitive-interrupt-are-messy
+title: Virtualizing level sensitive interrupt are messy
 description: To determine what can be lost, and can not
 date: 2026-1-27
 type: Post

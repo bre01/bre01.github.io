@@ -4,6 +4,7 @@ import { allPosts } from "contentlayer/generated";
 import { Metadata } from "next";
 import { Mdx } from "@/components/mdx-components";
 import Link from "next/link";
+import Image from "next/image";
 
 interface PostProps {
   params: {
@@ -71,14 +72,44 @@ export default async function PostPage({ params }: PostProps) {
 
   return (
     <>
-      <article className="py-6 prose dark:prose-invert">
-        <h1 className="mb-2">{post.title}</h1>
-        {post.description && (
-          <p className="text-xl mt-0 text-slate-700 dark:text-slate-200">
-            {post.description}
-          </p>
+      <article className="py-6">
+        {post.cover && (
+          <div className="relative w-full h-96 -mx-4 mb-8 overflow-hidden">
+            <Image
+              src={post.cover}
+              alt={post.title}
+              fill
+              className="object-cover"
+              priority
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
+              <h1 className="text-4xl font-bold mb-3 drop-shadow-lg">
+                {post.title}
+              </h1>
+              {post.description && (
+                <p className="text-xl text-white/90 drop-shadow-md">
+                  {post.description}
+                </p>
+              )}
+            </div>
+          </div>
         )}
-        <div className="flex gap-2 text-sm text-slate-600 dark:text-slate-400 mt-2">
+
+        {!post.cover && (
+          <>
+            <h1 className="text-4xl font-bold mb-2 text-slate-900 dark:text-slate-100">
+              {post.title}
+            </h1>
+            {post.description && (
+              <p className="text-xl mt-0 text-slate-700 dark:text-slate-200">
+                {post.description}
+              </p>
+            )}
+          </>
+        )}
+
+        <div className="flex gap-2 text-sm text-slate-600 dark:text-slate-400 mt-4 mb-6">
           {post.cate && (
             <>
               <span className="px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded">
@@ -105,8 +136,10 @@ export default async function PostPage({ params }: PostProps) {
             </>
           )}
         </div>
-        <hr className="my-4" />
-        <Mdx code={post.body.code} />
+
+        <div className="prose dark:prose-invert max-w-none">
+          <Mdx code={post.body.code} />
+        </div>
       </article>
 
       <nav className="py-8 border-t border-slate-200 dark:border-slate-800">

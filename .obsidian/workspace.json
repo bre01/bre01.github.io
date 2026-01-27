@@ -11,10 +11,14 @@
             "id": "2fa656d9708c05be",
             "type": "leaf",
             "state": {
-              "type": "empty",
-              "state": {},
+              "type": "markdown",
+              "state": {
+                "file": "content/posts/Virtualizing-level-sensitive-interrupt-are-messy.md",
+                "mode": "source",
+                "source": true
+              },
               "icon": "lucide-file",
-              "title": "New tab"
+              "title": "Virtualizing-level-sensitive-interrupt-are-messy"
             }
           }
         ]
@@ -74,7 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 271.5
+    "width": 483.5
   },
   "right": {
     "id": "9f02392bf7de3482",
@@ -90,6 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
+                "file": "public/Multi.png",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -99,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks"
+              "title": "Backlinks for Multi"
             }
           },
           {
@@ -108,11 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
+                "file": "public/Multi.png",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links"
+              "title": "Outgoing links from Multi"
             }
           },
           {
@@ -150,12 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
+                "file": "public/Multi.png",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline"
+              "title": "Outline of Multi"
             }
           }
         ]
@@ -178,22 +185,34 @@
   },
   "active": "2fa656d9708c05be",
   "lastOpenFiles": [
-    "public/paste_images",
+    "out/posts/Virtualizing-level-sensitive-interrupt-are-messy.txt",
+    "out/posts/Virtualizing-level-sensitive-interrupt-are-messy.html",
+    "out/_next/static/D3KhYTDGbSvX2j8DGA4vq/_ssgManifest.js",
+    "out/_next/static/D3KhYTDGbSvX2j8DGA4vq/_buildManifest.js",
+    "out/_next/static/D3KhYTDGbSvX2j8DGA4vq",
+    "out/_next/D3KhYTDGbSvX2j8DGA4vq",
     "out/_next/static/chunks/app/posts/[...slug]/page-7d8f9105fd2d1a01.js",
-    "out/_next/static/chunks/app/[...slug]/page-51a153e6edf8f673.js",
-    "out/_next/static/chunks/app/page-372165853abfcad9.js",
-    "out/_next/static/chunks/app/layout-1bedf159003f7169.js",
-    "out/_next/static/css/d8287b44ca28de3e.css",
-    "out/_next/static/chunks/webpack-8bf03b9de62f2431.js",
-    "out/_next/static/chunks/875-a6435e6ce3181f1e.js",
-    "out/_next/static/chunks/11-ff970ddd87f0866d.js",
-    "out/_next/static/94Kxk3BzxWgfBeAWtSDBS/_ssgManifest.js",
-    "out/_next/static/94Kxk3BzxWgfBeAWtSDBS/_buildManifest.js",
+    "out/_next/static/chunks/app/layout-1d78baa3fcf939e3.js",
+    "out/_next/static/css/5aa4b7902bff75e4.css",
+    "out/_next/static/chunks/webpack-43d874bcf7bf3689.js",
+    "out/_next/static/txixJ23Tqa__SdIQm5_3Z/_ssgManifest.js",
+    "out/paste_images/background.png",
+    "out/paste_images/background.jpg",
+    "public/background.jpg",
+    "public/paste_images/background.jpg",
+    "public/paste_images/background.png",
+    "out/paste_images/Pasted image 20260127215537.png",
+    "public/paste_images/Pasted image 20260127215537.png",
+    "content/pages/about.md",
+    "content/posts/thinks-god-unix-is-grepable.md",
     "content/posts/Virtualizing-level-sensitive-interrupt-are-messy.md",
+    "content/posts/read-shapefile-only-using-python-builtin-library.md",
+    "out/paste_images/Multi.png",
+    "public/Multi.png",
+    "public/next.svg",
+    "content/posts/add-clock-and-reset-device-in-zvm.md",
+    "content/posts/which-message-goes-to-which-tty.md",
     "node_modules/playwright-core/README.md",
-    "node_modules/playwright-core/lib/vite/traceViewer/playwright-logo.svg",
-    "node_modules/playwright-core/lib/vite/recorder/playwright-logo.svg",
-    "node_modules/playwright-core/lib/server/chromium/appIcon.png",
     "node_modules/playwright/README.md",
     "node_modules/playwright/lib/agents/playwright-test-planner.agent.md",
     "node_modules/playwright/lib/agents/playwright-test-plan.prompt.md",
@@ -211,18 +230,6 @@
     "node_modules/cytoscape/CODE_OF_CONDUCT.md",
     "node_modules/mermaid-isomorphic/README.md",
     "node_modules/mermaid-isomorphic/LICENSE.md",
-    "node_modules/d3/README.md",
-    "node_modules/mini-svg-data-uri/README.md",
-    "node_modules/cytoscape-cose-bilkent/README.md",
-    "node_modules/dagre-d3-es/README.md",
-    "node_modules/dagre-d3-es/LICENSE.md",
-    "node_modules/khroma/readme.md",
-    "node_modules/layout-base/layout-schema.png",
-    "node_modules/cytoscape-fcose/node_modules/layout-base/layout-schema.png",
-    "node_modules/cytoscape-fcose/demo/incrementalConstraints.gif",
-    "node_modules/cytoscape-fcose/demo/demo.gif",
-    "node_modules/@fortawesome/fontawesome-free/svgs/solid/z.svg",
-    "node_modules/@fortawesome/fontawesome-free/svgs/solid/yin-yang.svg",
-    "node_modules/@fortawesome/fontawesome-free/svgs/solid/yen-sign.svg"
+    "node_modules/d3/README.md"
   ]
 }

@@ -23,13 +23,23 @@ export default function RootLayout({ children }: RootLayoutProps) {
         className={`antialiased min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 ${inter.className}`}
       >
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <div className="max-w-2xl mx-auto py-10 px-4">
-            <header>
+          <div className="max-w-6xl mx-auto py-10 px-4">
+            <header className="mb-12">
               <div className="flex items-center justify-between">
                 <ModeToggle />
-                <nav className="ml-auto text-sm font-medium space-x-6">
-                  <Link href="/">Home</Link>
-                  <Link href="/about">About</Link>
+                <nav className="ml-auto text-lg font-medium space-x-8">
+                  <Link
+                    href="/"
+                    className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/about"
+                    className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                  >
+                    About
+                  </Link>
                 </nav>
               </div>
             </header>

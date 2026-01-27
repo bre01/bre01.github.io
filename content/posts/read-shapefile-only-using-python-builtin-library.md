@@ -3,6 +3,7 @@ title: Read shapefile only using python's built in libraray -- part 1
 description: Read shapefile only using python's built in libraray
 date: 2023-12-1
 type: Post
+cover: "/paste_images/Multi.png"
 ---
 
 Shapefile is open source, well, sort of. ESRI did not provide any tool to read it easily, 
